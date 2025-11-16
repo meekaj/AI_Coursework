@@ -7,16 +7,18 @@ import random
 class FLMPEnv(gym.Env):
     metadata = {"render_modes": ["ansi", "human"]}
 
-    def __init__(self, desc, portals=None, render_mode="ansi"):
+    def __init__(self, desc, portals=None, p=1.0, render_mode="ansi"):
         super().__init__()
-        self.desc = np.asarray(desc, dtype="O")
+        self.desc = np.asarray(desc, dtype="O") #desc is grid, shape give height and width
         self.nrow, self.ncol = self.desc.shape
         self.render_mode = render_mode
 
         self.action_space = spaces.Discrete(4)  # Left, Down, Right, Up
         self.observation_space = spaces.Discrete(self.nrow * self.ncol)
 
-        self.portals = portals if portals else {}
+        self.p = p # probability for direction
+
+        self.portals = portals if portals else {} #portal handling
         self._portal_states = {
             self.to_s(r, c): self.to_s(rt, ct)
             for k, (r, c) in self.portals.items()
@@ -43,12 +45,26 @@ class FLMPEnv(gym.Env):
 
     def step(self, action):
         row, col = self.to_row_col(self.s)
+        intended_action = action #what agent is trying to do
 
-        if action == 0:   # Left
+        #slipping, using p for intended or else agent slip 90 degrees anti clockwise
+        slip_map = {
+            0:1,#left slip to down
+            1:2,#down slip to right
+            2:3, #right slip to up
+            3:0#up slip to left
+        }
+
+        if np.random.random() < self.p:
+            actual_action = action
+        else:
+            actual_action = slip_map[action]
+
+        if actual_action == 0:   # Left
             new_row, new_col = row, col - 1
-        elif action == 1: # Down
+        elif actual_action == 1: # Down
             new_row, new_col = row + 1, col
-        elif action == 2: # Right
+        elif actual_action == 2: # Right
             new_row, new_col = row, col + 1
         else:             # Up
             new_row, new_col = row - 1, col
@@ -69,15 +85,21 @@ class FLMPEnv(gym.Env):
         cell = self.desc[r, c]
 
         # Terminal states
+        fell_in_hole = False
         if cell == "G":
             reward, terminated = 1.0, True
         elif cell == "H":
-            reward, terminated = 0.0, True
+            fell_in_hole = True #agent alive but record it fell
 
         self.s = new_state
-        return new_state, reward, terminated, False, {}
+        info = {
+            "fell_in_hole": fell_in_hole,
+            "intended_action": intended_action,
+            "actual_action": actual_action,
+        }
+        return new_state, reward, terminated, False, info
 
-    def render(self):
+    def render(self): #print new character for each cell
         out = ""
         agent_r, agent_c = self.to_row_col(self.s)
         for r in range(self.nrow):
