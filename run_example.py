@@ -24,9 +24,9 @@ def print_grid(desc, path=None):
 
 if __name__ == "__main__":
     #1. random maze generator
-    desc, portals = generate_flmp(size=12, wall_prob=0.2, hole_prob=0.15,
+    desc, portals = generate_flmp(size=11, wall_prob=0.2, hole_prob=0.15,
                                             n_portals=2, seed=123)
-    env = FLMPEnv(desc=desc, portals=portals, p=0.9,render_mode="ansi") #change p accordingly...
+    env = FLMPEnv(desc=desc, portals=portals, p=1,render_mode="ansi") #change p accordingly...
 
     #2. show maze grid
     print("Generated Maze:")
@@ -51,15 +51,16 @@ if __name__ == "__main__":
     #print("inital env")
     #print(env.render())
     
-
-    env = FLMPEnv(desc=desc, portals=portals, p=0.9, render_mode="ansi")
-
-    success, steps, hole_falls = follow_path(env, path, max_steps=300, verbose=False)
-    
-    print("Follow-path run summary:")
-    print(f"  Success: {success}")
-    print(f"  Steps taken: {steps}")
-    print(f"  Hole falls: {hole_falls}")
+    if path is not None:
+        env = FLMPEnv(desc=desc, portals=portals, p=1, render_mode="ansi")
+        success, steps, hole_falls = follow_path(env, path, max_steps=300, verbose=True)
+        print("Follow-path run summary:")
+        print(f"  Success: {success}")
+        print(f"  Steps taken: {steps}")
+        print(f"  Hole falls: {hole_falls}")
+        env.close()
+    else:
+        print("A* found no path.")
 
     '''    
     done = False

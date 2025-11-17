@@ -34,46 +34,46 @@ def follow_path(env, path, max_steps=200, verbose=False):
 
     to return if successful, how many steps and how many times it fell
     """
+    if path is None or len(path) == 0:
+        raise ValueError("Path is None or empty; cannot follow it.")
+    
     obs, _ = env.reset()
     steps = 0
     hole_falls = 0
 
-    nrow, ncol = env.nrow, env.ncol
     goal_state = env.goal_state
 
     #map from state index to (row, col)
     def state_to_rc(s):
         return env.to_row_col(s)
 
-    #(start at the first cell)
-    idx = 0
-
     for t in range(max_steps):
-        steps += 1
-
         r, c = state_to_rc(obs)
 
-        #if we reached the goal, stop
+        # if we reached the goal, stop
         if obs == goal_state:
             if verbose:
                 print(f"Reached goal at step {steps}.")
             return True, steps, hole_falls
 
-        #choose target on the path we want to move towards
-        if idx < len(path) - 1 and (r, c) == path[idx]:
-            # move to the next point on path
-            target = path[idx + 1]
-            idx += 1
+        # find the closest point on the A* path to our current position using Manhattan distance
+        distances = [abs(pr - r) + abs(pc - c) for (pr, pc) in path]
+        closest_idx = min(range(len(path)), key=lambda i: distances[i])
+
+        # choose a target: one step ahead along the path if possible
+        if closest_idx < len(path) - 1:
+            target = path[closest_idx + 1]
         else:
-            # if we've slipped off, aim for goal
-            target = path[-1]
+            target = path[closest_idx]  # already at the goal cell
 
         action = action_towards((r, c), target)
         if action is None:
-            # already at target, just continue
+            # already exactly at target, nothing to do
+            steps +=1
             continue
 
         obs, reward, terminated, truncated, info = env.step(action)
+        steps +=1
 
         if info.get("fell_in_hole", False):
             hole_falls += 1
@@ -83,14 +83,12 @@ def follow_path(env, path, max_steps=200, verbose=False):
             print(
                 f"Step {steps}: intended={info['intended_action']}, "
                 f"actual={info['actual_action']}, "
-                f"pos=({nr}, {nc}), reward={reward}, "
-                f"fell_in_hole={info['fell_in_hole']}"
+                f"pos=({nr}, {nc}), target={target}, "
+                f"reward={reward}, fell_in_hole={info['fell_in_hole']}"
             )
 
         if terminated or truncated:
-            #if terminated by reaching goal, success = True
             success = (reward > 0)
             return success, steps, hole_falls
+    return False, steps, hole_falls #we did not reach goal in time
 
-    # did not reach goal within max_steps
-    return False, steps, hole_falls
